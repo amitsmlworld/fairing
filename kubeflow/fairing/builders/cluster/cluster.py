@@ -27,7 +27,8 @@ class ClusterBuilder(BaseBuilder):
                  namespace=None,
                  dockerfile_path=None,
                  cleanup=False,
-                 executable_path_prefix=None):
+                 executable_path_prefix=None,
+                 custom_image_tag=None):
         super().__init__(
             registry=registry,
             image_name=image_name,
@@ -43,6 +44,8 @@ class ClusterBuilder(BaseBuilder):
         self.namespace = namespace or utils.get_default_target_namespace()
         self.cleanup = cleanup
         self.executable_path_prefix = executable_path_prefix
+        if custom_image_tag is not None:
+            self.custom_image_tag = custom_image_tag
 
     def build(self):
         logging.info("Building image using cluster builder.")
@@ -63,7 +66,10 @@ class ClusterBuilder(BaseBuilder):
             )
         self.preprocessor.output_map[dockerfile_path] = 'Dockerfile'
         context_path, context_hash = self.preprocessor.context_tar_gz()
-        self.image_tag = self.full_image_name(context_hash)
+        if self.custom_image_tag is None:
+            self.image_tag = self.full_image_name(context_hash)
+        else:
+            self.image_tag = self.full_image_name(self.custom_image_tag)
         self.context_source.prepare(context_path)
         labels = {'fairing-builder': 'kaniko'}
         labels['fairing-build-id'] = str(uuid.uuid1())
@@ -119,3 +125,4 @@ class ClusterBuilder(BaseBuilder):
                     created_job.metadata.namespace,
                     body=client.V1DeleteOptions(propagation_policy='Foreground')
                 )
+        return self.image_tag
